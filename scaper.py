@@ -1,10 +1,9 @@
 from bs4 import BeautifulSoup
 import requests
 
-addressToScrape = 'https://www.nytimes.com/interactive/2021/08/04/sports/olympics/sydney-mclaughlin-hurdles-400m-olympics.html?action=click&module=Top%20Stories&pgtype=Homepage'
-
-htmlText = requests.get(addressToScrape).text
+todaysPaperURL = 'https://www.nytimes.com/section/todayspaper'
+htmlText = requests.get(todaysPaperURL).text
 soup = BeautifulSoup(htmlText, 'lxml')
-story = soup.findAll('p', class_='g-body')
+story = soup.findAll('p', class_='css-axufdj evys1bk0')
 for paragraphs in story:
     print(paragraphs.text)
