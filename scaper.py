@@ -1,5 +1,14 @@
+import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
+
+
+class Article:
+    def __init__(self, content):
+        self.content = content
+
+    def exportArticles(self):
+        pass
 
 
 def getTodaysHTML():
@@ -38,9 +47,28 @@ def getArticleLinks():
         if not formattedLink[12:23] == 'pageoneplus':
             articleLinks.append('https://www.nytimes.com' + element[beginning:end])
 
+    print("Number of articles from today's paper: " + str(len(articleLinks)))
     return articleLinks
 
 
-todaysArticleLinks = getArticleLinks()
-print(todaysArticleLinks)
-print(len(todaysArticleLinks))
+def scrapeArticles(articleLinks):
+    scrapedArticles = []
+    # Extract content from article
+    for link in articleLinks:
+        articleContent = ''
+        html = requests.get(link).text
+        soup = BeautifulSoup(html, 'lxml')
+        story = soup.findAll('p', class_='css-axufdj evys1bk0')
+        for paragraphs in story:
+            articleContent += paragraphs.get_text()
+        scrapedArticles.append(Article(articleContent))
+
+    return scrapedArticles
+
+
+articleLinks = getArticleLinks()
+articleList = scrapeArticles(articleLinks)
+
+for article in articleList:
+    print(article.content)
+
