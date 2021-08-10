@@ -12,7 +12,7 @@ class Article:
 
 
 def getTodaysHTML():
-    driver = webdriver.Chrome(executable_path="C:\Program Files (x86)\chromedriver.exe")
+    driver = webdriver.Chrome()
     driver.get("https://www.nytimes.com/section/todayspaper")
     htmlText = driver.page_source
     driver.quit()
