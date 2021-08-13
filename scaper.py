@@ -9,9 +9,10 @@ import datetime
 
 
 class Article:
-    def __init__(self, content, url):
+    def __init__(self, content, url, author):
         self.content = content
         self.url = url
+        self.author = author
 
         url_parts = url.split("/")
         self.year = url_parts[3]
@@ -80,16 +81,28 @@ def get_article_links() -> List[str]:
 def scrape_articles(article_links: List[str]) -> List[Article]:
     scraped_articles = []
 
-    # Extract content from article
+    # Extract data from article
     for link in article_links:
+        # Extract content from article
         article_content = ''
+        author = ''
         html = requests.get(link).text
         soup = BeautifulSoup(html, 'lxml')
         story = soup.findAll('p', class_='css-axufdj evys1bk0')
-
         for paragraphs in story:
-            article_content += paragraphs.get_text()
-        scraped_articles.append(Article(article_content, link))
+            article_content += ('\n' + paragraphs.get_text())
+
+        # Extract author(s) from article
+        article_authors = soup.findAll("div", class_="css-233int epjyd6m0")
+        for author in article_authors:
+            author = author.get_text()
+            
+        # if not found checks other means to extract the author names
+        if author == '':
+            article_authors = soup.findAll("p", class_="css-1hmtklo e1jsehar1")
+            for author in article_authors:
+                author = author.get_text()
+        scraped_articles.append(Article(article_content, link, author))
 
     return scraped_articles
 
