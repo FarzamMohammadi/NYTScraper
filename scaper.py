@@ -5,6 +5,7 @@ from typing import List
 import os
 import json
 import shutil
+import datetime
 
 
 class Article:
@@ -12,15 +13,12 @@ class Article:
         self.content = content
         self.url = url
 
-        urlParts = url.split("/")
-        self.year = urlParts[3]
-        self.month = urlParts[4]
-        self.day = urlParts[5]
-        self.path = urlParts[-1].split(".")[0]
-        # todo add categories which can be dervied from the url
-
-    def exportArticles(self):
-        pass
+        url_parts = url.split("/")
+        self.year = url_parts[3]
+        self.month = url_parts[4]
+        self.day = url_parts[5]
+        self.category = url_parts[6]
+        self.path = url_parts[-1].split(".")[0]
 
     # https://stackoverflow.com/a/15538391/1489726
     def to_json(self):
@@ -28,59 +26,72 @@ class Article:
                           sort_keys=True, indent=4)
 
 
-def getTodaysHTML():
+def scrape_todays_html():
     driver = webdriver.Chrome()
     driver.get("https://www.nytimes.com/section/todayspaper")
-    htmlText = driver.page_source
+    html_text = driver.page_source
     driver.quit()
-    return htmlText
+    return html_text
 
 
-def getArticleLinks():
-    htmlText = getTodaysHTML()
-    soup = BeautifulSoup(htmlText, 'lxml')
-    highlightArticles = soup.findAll('h2', class_='css-byk1jx e4e4i5l1')
-    rawHTMLLinks = []
-    articleLinks = []
+def get_article_links() -> List[str]:
+    html_text = scrape_todays_html()
+    soup = BeautifulSoup(html_text, 'lxml')
+    highlight_articles = soup.findAll('h2', class_='css-byk1jx e4e4i5l1')
+    raw_html_links = []
+    article_links = []
+    unwanted_categories = ['pageoneplus']
+    year = str(datetime.date.today().year)
 
-    # Retrieve highlight article links
-    for articles in highlightArticles:
-        rawHTMLLinks.append(str(articles.a))
-    for link in rawHTMLLinks:
+    # Retrieve highlight article raw links
+    for articles in highlight_articles:
+        raw_html_links.append(str(articles.a))
+
+    # Retrieve remaining article raw links
+    remaining_articles = soup.findAll('div', class_='css-141drxa')
+    for articles in remaining_articles:
+        raw_html_links.append(str(articles.a))
+    # Convert raw links to properly formatted URL
+    for link in raw_html_links:
+        unwanted_article = False
+
         beginning = link.find('/')
         end = link.find('">')
-        articleLinks.append('https://www.nytimes.com' + link[beginning:end])
+        formatted_link = link[beginning:end]
 
-    # Retrieve remaining article links
-    remainingArticles = soup.findAll('div', class_='css-141drxa')
-    for articles in remainingArticles:
-        rawHTMLLinks.append(str(articles.a))
+        link_parts = formatted_link.split('/')
+        article_year = link_parts[1]
+        article_category = link_parts[4]
 
-    for element in rawHTMLLinks:
-        beginning = element.find('/')
-        end = element.find('">')
-        formattedLink = element[beginning:end]
-        # Prevent correction links to be added to the list
-        if not formattedLink[12:23] == 'pageoneplus':
-            articleLinks.append('https://www.nytimes.com' + element[beginning:end])
+        # Prevent unwanted links to be added to the list
+        if article_year != year:
+            unwanted_article = True
+        for category in unwanted_categories:
+            if article_category == category:
+                unwanted_article = True
 
-    print("Number of articles from today's paper: " + str(len(articleLinks)))
-    return articleLinks
+        if not unwanted_article:
+            article_links.append('https://www.nytimes.com' + link[beginning:end])
+
+    print("Number of articles from today's paper: " + str(len(article_links)))
+    return article_links
 
 
-def scrapeArticles(articleLinks) -> List[Article]:
-    scrapedArticles = []
+def scrape_articles(article_links: List[str]) -> List[Article]:
+    scraped_articles = []
+
     # Extract content from article
-    for link in articleLinks:
-        articleContent = ''
+    for link in article_links:
+        article_content = ''
         html = requests.get(link).text
         soup = BeautifulSoup(html, 'lxml')
         story = soup.findAll('p', class_='css-axufdj evys1bk0')
-        for paragraphs in story:
-            articleContent += paragraphs.get_text()
-        scrapedArticles.append(Article(articleContent, link))
 
-    return scrapedArticles
+        for paragraphs in story:
+            article_content += paragraphs.get_text()
+        scraped_articles.append(Article(article_content, link))
+
+    return scraped_articles
 
 
 def write_articles_to_json_files(article_list: List[Article]):
@@ -95,7 +106,6 @@ def write_articles_to_json_files(article_list: List[Article]):
             f.write(article.to_json())
 
 
-articleLinks = getArticleLinks()
-articleList = scrapeArticles(articleLinks)
-
-write_articles_to_json_files(articleList)
+article_links = get_article_links()
+article_list = scrape_articles(article_links)
+write_articles_to_json_files(article_list)
