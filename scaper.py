@@ -9,10 +9,12 @@ import datetime
 
 
 class Article:
-    def __init__(self, content, url, author):
+    def __init__(self, title, subtitle, content, author, url):
+        self.title = title
+        self.subtitle = subtitle
         self.content = content
-        self.url = url
         self.author = author
+        self.url = url
 
         url_parts = url.split("/")
         self.year = url_parts[3]
@@ -61,15 +63,19 @@ def get_article_links() -> List[str]:
         formatted_link = link[beginning:end]
 
         link_parts = formatted_link.split('/')
-        article_year = link_parts[1]
-        article_category = link_parts[4]
 
         # Prevent unwanted links to be added to the list
-        if article_year != year:
-            unwanted_article = True
-        for category in unwanted_categories:
-            if article_category == category:
+        try:
+            article_year = link_parts[1]
+            article_category = link_parts[4]
+
+            if article_year != year:
                 unwanted_article = True
+            for category in unwanted_categories:
+                if article_category == category:
+                    unwanted_article = True
+        except IndexError:
+            unwanted_article = True
 
         if not unwanted_article:
             article_links.append('https://www.nytimes.com' + link[beginning:end])
@@ -83,27 +89,45 @@ def scrape_articles(article_links: List[str]) -> List[Article]:
 
     # Extract data from article
     for link in article_links:
+        title, subtitle, content, author = '', '', '', ''
+
         # Extract content from article
-        article_content = ''
-        author = ''
         html = requests.get(link).text
         soup = BeautifulSoup(html, 'lxml')
-        story = soup.findAll('p', class_='css-axufdj evys1bk0')
-        for paragraphs in story:
-            article_content += ('\n' + paragraphs.get_text())
+        article_content = soup.findAll('p', class_='css-axufdj evys1bk0')
+        for paragraphs in article_content:
+            content += ('\n' + paragraphs.get_text())
 
         # Extract author(s) from article
-        article_authors = soup.findAll("div", class_="css-233int epjyd6m0")
-        for author in article_authors:
-            author = author.get_text()
-            
-        # if not found checks other means to extract the author names
+        article_authors = soup.find("div", class_="css-233int epjyd6m0")
+        if article_authors is not None:
+            for authors in article_authors:
+                author += authors.get_text() + " "
+            # If not found checks other means to extract the author names
         if author == '':
-            article_authors = soup.findAll("p", class_="css-1hmtklo e1jsehar1")
-            for author in article_authors:
-                author = author.get_text()
-        scraped_articles.append(Article(article_content, link, author))
+            article_authors = soup.find("p", class_="css-1hmtklo e1jsehar1")
+            if article_authors is not None:
+                author += article_authors.get_text()
+        author = author.rstrip(" ")
 
+        # Extract title from article
+        article_title = soup.find('h1', {'data-testid': 'headline'})
+        if article_title is None:
+            title = ''
+        else:
+            title = article_title.get_text()
+
+        # Extract subtitle from article
+        article_subtitle = soup.find('p', id='article-summary')
+        if article_subtitle is None:
+            article_subtitle = soup.find('p', class_='css-1b6a17a e1wiw3jv0')
+
+        if article_subtitle is None:
+            subtitle = ''
+        else:
+            subtitle = article_subtitle.get_text()
+
+        scraped_articles.append(Article(title, subtitle, content, author, link))
     return scraped_articles
 
 
